@@ -1,0 +1,213 @@
+---
+title: "303A2"
+author: "ChenxinranShen"
+date: "24/02/2020"
+output: html_document
+---
+# Question 1
+```{r input data}
+
+library(tidyverse)
+school_data <- read.csv("school.csv")
+head(school_data)
+glimpse(school_data)
+```
+## Question 1a
+Why you would have a concern about one of the assumptions of linear regression?
+
+The independence assumption for linear regression is doubted since all observations are from the same city. Students from each school are related to each other.
+
+## Question 1b
+Create a scatter plot to examine the relationship between verbal IQ scores and end of year language scores.
+```{r 1b, eval=FALSE}
+attach(school_data)
+plot(iq, test, main = "Scatter plot of verbal IQ scores and language scores")
+abline(lm(test~iq),col = "red")
+```
+From the scatter plot, we can see there's a positive linear relationship between verbal iq score and language test score. Since there's no otliers, we can say there's a strong relationship. 
+
+## Question 1c
+Create 2 new variables, mean_ses and mean_iq for each school
+```{r 1c}
+school_data2<-school_data %>%
+  group_by(school) %>%
+  #summarise(mean_ses = mean(ses),mean_iq = mean(iq))
+  mutate(mean_ses = mean(ses),mean_iq = mean(iq))
+head(school_data2)
+```
+
+## Question 1d
+Fit a linear model, briefly interpret the results.
+```{r 1d}
+head(school_data2)
+school_data2$sex <- as.factor(school_data2$sex)
+school_data2$minority_status <- as.factor(school_data2$minority_status)
+#school_data2$mean_ses <- as.factor(school_data2$mean_ses)
+lm1d<-lm(test~iq+sex+ses+minority_status+mean_ses+mean_iq,data = school_data2)
+
+summary(lm1d)
+confint(lm1d)
+```
+
+What the intercept means?For which subgroup of students it applies?
+
+For one unit increase of variable in reference group (sex = 0, minority_status = 0, iq = 0, ses = 0, mean_ses = 0, mean_iq = 0), the response variable test score increase by 38.45808.
+
+The location of the confidence intervals for each covariate below 0, include0, or above 0?
+
+below 0: mean_ses
+
+include 0: subgroup of student with minority status (value = 1).
+
+above 0: iq, mean_iq, subgroup of student with sex value = 1.
+
+## Question 1e
+Fit a linear mixed model with the same fixed effect as 1c, with a random intercept for school
+https://strengejacke.wordpress.com/2014/10/26/visualizing-generalized-linear-mixed-effects-models-with-ggplot-rstats-lme4/
+```{r 1e}
+lmm1e<-lme4::lmer(test~iq+sex+ses+minority_status+mean_ses+mean_iq+(1|school),data = school_data2)
+summary(lmm1e)
+confint(lmm1e)
+```
+
+Variance of random effect is 8.177, variance of mixed effect is 38.24.The subject effect is explained by 17.62%.
+
+## Question 1f
+Describe similarities and differences betwen the coefficients of the fixed effect in the results from 1d, 1e and what causes the difference.
+
+The coefficient of 2 models are similar, which means the slopes of 2 models are close. 
+95% confidence interval of reference group is [37.4412106, 39.31755070] for linear mixed model, which has a larger range than CI of linear model, which is [37.8448162, 39.0713519].
+
+The confidence interval of linear mixed model is wider than linear model, this is because of the random effect of different schools.
+
+## Question 1g
+Plot the random effects for the different schools. Does it seems reasonable to have included these random effects.
+```{r 1g}
+random_effects <- lme4::ranef(lmm1e, condVar=TRUE)
+ranef_df <- as.data.frame(random_effects)
+
+ranef_df %>%
+ggplot(aes(x = grp, y = condval, ymin = condval - 2*condsd, ymax = condval + 2*condsd)) +
+geom_point() +
+geom_errorbar() +
+coord_flip()
+```
+
+It is reasonable to include different schools as random effects. 
+
+Different schools' intercepts have differences to each other. The highest intercept is around 5 above the average, and the lowest is around -4.8 below the average. 
+
+However, since the CI of most of schools have a wide range and almost two third of the schools' CI include 0, which means the differences between most of the individual school are not extreme.
+
+
+## Question 1h
+Write a short paragraph summarising. Focus on question of interest: Which variables are associated with Grade 8 students' score on an end of year language test?
+
+The two most significant variables associate with the score is IQ and socioeconomic status, both of them have a very small p-value. p-value< 2e-16 for IQ and p-value=5.19e-13 IQ have a 95%CI [2.0649432, 2.49094360]
+
+The test score will increase by 38.45808 for each unit increasement in reference group. The model is suppose to have different school as random effect, since the proportion of residual variation i 17.62%.
+
+As a conclusion, the language scores of students from same school are strongly related, and the individual IQ, status of their family are key variables associated with their test score.
+
+# Question 2
+```{r}
+smokeFile <-'smoke.RData'
+#if(!file.exists(smokeFile)){
+ # download.file('http://pbrown.ca/teaching/303/data/smoke.RData', smokeFile)}
+#(load(smokeFile))
+load(smokeFile)
+smokeFormats[smokeFormats[, "colName"] == "chewing_tobacco_snuff_or",c("colName", "label")]
+# get rid of 9, 10 year olds and missing age and race
+smokeSub = smoke[which(smoke$Age > 10 & !is.na(smoke$Race)),]
+smokeSub$ageC = smokeSub$Age - 16
+library("glmmTMB")
+smokeModelT = glmmTMB(chewing_tobacco_snuff_or ~ ageC * Sex + RuralUrban + Race + (1 | state/school), data = smokeSub, family = binomial(link = "logit"))
+knitr::kable(summary(smokeModelT)$coef$cond, digits = 2)
+Pmisc::ranefPlot(smokeModelT, grpvar = "state", level = 0.5,maxNames = 12)
+Pmisc::ranefPlot(smokeModelT, grpvar = "school:state", level = 0.5,maxNames = 12, xlim = c(-1, 2.2))
+```
+
+
+## Question 2a
+Write down a statistical model corresponding to smokeModelT. Briefly explain the difference between this model and a generalized linear model.
+$$Y_{ijk}\sim  Gamma(\alpha, \beta)$$
+$$logit(p_{ijk})=X_{ij}\beta+A_i+B_{ij}$$
+
+$$A_{ij} \sim N(0,\sigma^2_A)$$
+$$B_{ij} \sim N(0,\sigma^2_B) $$
+The generalized linear model assume that all observations are independent to each other, which glmm doesn't.
+
+## Question 2b
+Briefly explain why this generalized linear mixed model with a logit link is more appropriate for this dataset than a linear mixed model.
+
+Because the response variable isn't noramlly distributed. By using a link function, we can make it become normal.
+
+## Question 2c
+Q. Write a paragraph assessing the hypothesis that [state-level differences in chewing tabacoo usage amongst high school students], are much larger than [difference between schools within a state]
+
+
+The hypothesis doesn't hold. Since the estimates of standard diviation for student smoke between states is 0.31. It's much lower than the CI for student smoke between schools in a state, which is 0.75. 
+
+Q. If one was interested in identifying locations with many tobacco chewers (in order to sell chewing tobacco to children, or if you prefer to implement programs to reduce tobacco chewing), would it be important to find individual schools with high chewing rates or would targeting those states where chewing is most common be sufficient?
+
+It's more important to find individual schools with high chewing rate than finding state, since there's higher standard deviation between different schools in a state.
+
+There's higher profit and efficiency to tartget school with higher chewing rate. The top rated school has >1.0 deriviation above the average, which the top rated states has about 0.2 deviation above the average.
+
+The CIs of interceptions on the plot of schools in one state are narrower, which means there is higher accurecy for finding customers in the target schools than in the targed state.
+
+# Question 3
+```{r}
+pedestrainFile = Pmisc::downloadIfOld('http://pbrown.ca/teaching/303/data/pedestrians.rds')
+pedestrians = readRDS(pedestrainFile)
+pedestrians = pedestrians[!is.na(pedestrians$time), ]
+pedestrians$y = pedestrians$Casualty_Severity == 'Fatal'
+dim(pedestrians)
+pedestrians[1:3, ]
+table(pedestrians$Casualty_Severity, pedestrians$sex)
+range(pedestrians$time)
+
+theGlm = glm(y ~ sex + age + Light_Conditions + Weather_Conditions,data = pedestrians, family = binomial(link = "logit"))
+knitr::kable(summary(theGlm)$coef, digits = 3)
+
+theGlmInt = glm(y ~ sex * age + Light_Conditions + Weather_Conditions,data = pedestrians, family = binomial(link = "logit"))
+knitr::kable(summary(theGlmInt)$coef, digits = 3)
+
+newData = expand.grid(age = levels(pedestrians$age),sex = c('Male', 'Female'),Light_Conditions = levels(pedestrians$Light_Conditions)[1],Weather_Conditions = levels(pedestrians$Weather_Conditions)[1])
+thePred = as.matrix(as.data.frame(predict(theGlmInt, newData, se.fit=TRUE)[1:2])) %*% Pmisc::ciMat(0.99)
+thePred = as.data.frame(thePred)
+thePred$sex =newData$sex
+thePred$age = as.numeric(gsub("[[:punct:]].*|[[:alpha:]]", "", newData$age))
+toPlot2 = reshape2::melt(thePred, id.vars = c('age','sex'))
+toPlot3 = reshape2::dcast(toPlot2, age ~ sex + variable)
+
+matplot(toPlot3$age, exp(toPlot3[,-1]),type='l', log='y', col=rep(c('black','red'), each=3),lty=rep(c(1,2,2),2),ylim = c(0.007, 0.11), xaxs='i',xlab= 'age', ylab='prob')
+legend('topleft', lty=1, col=c('black','red'), legend = c('male','female'), bty='n')
+
+```
+
+
+## Question 3a
+Write a short paragraph describing a case/control model (not the results) corresponding the theGlm and theGlmInt objects. Be sure to specify the case definition and the control group,and what the covariates are.
+
+The model is about if the patient has a fatal or a slight injury.
+case: fatal injury
+control: slight injury
+The covariates are gender, age, light conditions and weather conditions. The only difference between two models is, there is a interaction of female and age in theGlmint model.
+
+## Question 3b
+Write a short report assessing whether the UK road accident data are consistent with the hypothesis that [women tend to be, on average, safer as pedestrians than men, particularly as teenagers and in early adulthood]. Explain which of the two models fit is more appropriate for addressing this research question
+
+In theGLMInt model, the estimate of Female is 0.58 with CI[0.53, 0.63], which is much lower than male. It's reasonable to say that women tend to be safer than men.
+
+However, teenage female (age 11-15, 16-20) tend to be in more danger than adult female. The estimates of teenage female around age 11-15 and 16-20 are are 1.33 and 1.16 respectively.
+
+Therefore, the second model is better. As we are exploring the relationship between the fitted variable and gender and age at the same time, we need to study on the intraction of this two covariates.
+
+## Question 3c
+It is well established that [women are generally more willing to seek medical attention for health problems than men], and it is hypothesized that [men are less likely than women to report minor injuries caused by road accidents]. 
+Write a critical assessment of [whether or not the \control \group is a valid one for assessing whether women are on average better at road safety than man].
+
+From figue2, the probability of female being a fatal case in baseline conditons is lower than the one
+of male. It is reasonable to say that female are more likely to be slight injuried than male . Since women more willing to seek medical attention and report accidents, female can be over represented in control group. By in overall, the case/control model is valid.
+
