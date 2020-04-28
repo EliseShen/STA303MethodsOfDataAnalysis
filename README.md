@@ -1,3 +1,6 @@
+## The Application of Linear Mixed Model and Generalized Linear Mixed Model
+This is a course report the STA303, Methods for Data Analysis, at the University of Toronto.
+
 Q1
 Linear Mixed Model
 Use scatter plot to examine the relationship between 7 variables and  language scores. 
